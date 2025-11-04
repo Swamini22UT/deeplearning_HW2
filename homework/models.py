@@ -1,163 +1,183 @@
-"""
-Implement the following models for classification.
-
-Feel free to modify the arguments for each of model's __init__ function.
-This will be useful for tuning model hyperparameters such as hidden_dim, num_layers, etc,
-but remember that the grader will assume the default constructor!
-"""
-
 from pathlib import Path
 
 import torch
 import torch.nn as nn
 
-
-class ClassificationLoss(nn.Module):
-    def forward(self, logits: torch.Tensor, target: torch.LongTensor) -> torch.Tensor:
-        """
-        Multi-class classification loss
-        Hint: simple one-liner
-
-        Args:
-            logits: tensor (b, c) logits, where c is the number of classes
-            target: tensor (b,) labels
-
-        Returns:
-            tensor, scalar loss
-        """
-        raise NotImplementedError("ClassificationLoss.forward() is not implemented")
+HOMEWORK_DIR = Path(__file__).resolve().parent
+INPUT_MEAN = [0.2788, 0.2657, 0.2629]
+INPUT_STD = [0.2064, 0.1944, 0.2252]
 
 
-class LinearClassifier(nn.Module):
+class Classifier(nn.Module):
     def __init__(
         self,
-        h: int = 64,
-        w: int = 64,
+        in_channels: int = 3,
         num_classes: int = 6,
     ):
         """
-        Args:
-            h: int, height of the input image
-            w: int, width of the input image
-            num_classes: int, number of classes
-        """
-        super().__init__()
-
-        raise NotImplementedError("LinearClassifier.__init__() is not implemented")
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        Args:
-            x: tensor (b, 3, H, W) image
-
-        Returns:
-            tensor (b, num_classes) logits
-        """
-        raise NotImplementedError("LinearClassifier.forward() is not implemented")
-
-
-class MLPClassifier(nn.Module):
-    def __init__(
-        self,
-        h: int = 64,
-        w: int = 64,
-        num_classes: int = 6,
-    ):
-        """
-        An MLP with a single hidden layer
+        A convolutional network for image classification.
 
         Args:
-            h: int, height of the input image
-            w: int, width of the input image
-            num_classes: int, number of classes
-        """
-        super().__init__()
-
-        raise NotImplementedError("MLPClassifier.__init__() is not implemented")
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        Args:
-            x: tensor (b, 3, H, W) image
-
-        Returns:
-            tensor (b, num_classes) logits
-        """
-        raise NotImplementedError("MLPClassifier.forward() is not implemented")
-
-
-class MLPClassifierDeep(nn.Module):
-    def __init__(
-        self,
-        h: int = 64,
-        w: int = 64,
-        num_classes: int = 6,
-    ):
-        """
-        An MLP with multiple hidden layers
-
-        Args:
-            h: int, height of image
-            w: int, width of image
+            in_channels: int, number of input channels
             num_classes: int
-
-        Hint - you can add more arguments to the constructor such as:
-            hidden_dim: int, size of hidden layers
-            num_layers: int, number of hidden layers
         """
         super().__init__()
 
-        raise NotImplementedError("MLPClassifierDeep.__init__() is not implemented")
+        self.register_buffer("input_mean", torch.as_tensor(INPUT_MEAN))
+        self.register_buffer("input_std", torch.as_tensor(INPUT_STD))
+
+        # TODO: implement
+        pass
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Args:
-            x: tensor (b, 3, H, W) image
+            x: tensor (b, 3, h, w) image
 
         Returns:
             tensor (b, num_classes) logits
         """
-        raise NotImplementedError("MLPClassifierDeep.forward() is not implemented")
+        # optional: normalizes the input
+        z = (x - self.input_mean[None, :, None, None]) / self.input_std[None, :, None, None]
+
+        # TODO: replace with actual forward pass
+        logits = torch.randn(x.size(0), 6)
+
+        return logits
+
+    def predict(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Used for inference, returns class labels
+        This is what the AccuracyMetric uses as input (this is what the grader will use!).
+        You should not have to modify this function.
+
+        Args:
+            x (torch.FloatTensor): image with shape (b, 3, h, w) and vals in [0, 1]
+
+        Returns:
+            pred (torch.LongTensor): class labels {0, 1, ..., 5} with shape (b, h, w)
+        """
+        return self(x).argmax(dim=1)
 
 
-class MLPClassifierDeepResidual(nn.Module):
+class Detector(torch.nn.Module):
     def __init__(
         self,
-        h: int = 64,
-        w: int = 64,
-        num_classes: int = 6,
+        in_channels: int = 3,
+        num_classes: int = 3,
     ):
         """
-        Args:
-            h: int, height of image
-            w: int, width of image
-            num_classes: int
+        A single model that performs segmentation and depth regression
 
-        Hint - you can add more arguments to the constructor such as:
-            hidden_dim: int, size of hidden layers
-            num_layers: int, number of hidden layers
+        Args:
+            in_channels: int, number of input channels
+            num_classes: int
         """
         super().__init__()
 
-        raise NotImplementedError("MLPClassifierDeepResidual.__init__() is not implemented")
+        self.register_buffer("input_mean", torch.as_tensor(INPUT_MEAN))
+        self.register_buffer("input_std", torch.as_tensor(INPUT_STD))
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # TODO: implement
+        pass
+
+    def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """
+        Used in training, takes an image and returns raw logits and raw depth.
+        This is what the loss functions use as input.
+
         Args:
-            x: tensor (b, 3, H, W) image
+            x (torch.FloatTensor): image with shape (b, 3, h, w) and vals in [0, 1]
 
         Returns:
-            tensor (b, num_classes) logits
+            tuple of (torch.FloatTensor, torch.FloatTensor):
+                - logits (b, num_classes, h, w)
+                - depth (b, h, w)
         """
-        raise NotImplementedError("MLPClassifierDeepResidual.forward() is not implemented")
+        # optional: normalizes the input
+        z = (x - self.input_mean[None, :, None, None]) / self.input_std[None, :, None, None]
+
+        # TODO: replace with actual forward pass
+        logits = torch.randn(x.size(0), 3, x.size(2), x.size(3))
+        raw_depth = torch.rand(x.size(0), x.size(2), x.size(3))
+
+        return logits, raw_depth
+
+    def predict(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        """
+        Used for inference, takes an image and returns class labels and normalized depth.
+        This is what the metrics use as input (this is what the grader will use!).
+
+        Args:
+            x (torch.FloatTensor): image with shape (b, 3, h, w) and vals in [0, 1]
+
+        Returns:
+            tuple of (torch.LongTensor, torch.FloatTensor):
+                - pred: class labels {0, 1, 2} with shape (b, h, w)
+                - depth: normalized depth [0, 1] with shape (b, h, w)
+        """
+        logits, raw_depth = self(x)
+        pred = logits.argmax(dim=1)
+
+        # Optional additional post-processing for depth only if needed
+        depth = raw_depth
+
+        return pred, depth
 
 
-model_factory = {
-    "linear": LinearClassifier,
-    "mlp": MLPClassifier,
-    "mlp_deep": MLPClassifierDeep,
-    "mlp_deep_residual": MLPClassifierDeepResidual,
+MODEL_FACTORY = {
+    "classifier": Classifier,
+    "detector": Detector,
 }
+
+
+def load_model(
+    model_name: str,
+    with_weights: bool = False,
+    **model_kwargs,
+) -> torch.nn.Module:
+    """
+    Called by the grader to load a pre-trained model by name
+    """
+    m = MODEL_FACTORY[model_name](**model_kwargs)
+
+    if with_weights:
+        model_path = HOMEWORK_DIR / f"{model_name}.th"
+        assert model_path.exists(), f"{model_path.name} not found"
+
+        try:
+            m.load_state_dict(torch.load(model_path, map_location="cpu"))
+        except RuntimeError as e:
+            raise AssertionError(
+                f"Failed to load {model_path.name}, make sure the default model arguments are set correctly"
+            ) from e
+
+    # limit model sizes since they will be zipped and submitted
+    model_size_mb = calculate_model_size_mb(m)
+
+    if model_size_mb > 20:
+        raise AssertionError(f"{model_name} is too large: {model_size_mb:.2f} MB")
+
+    return m
+
+
+def save_model(model: torch.nn.Module) -> str:
+    """
+    Use this function to save your model in train.py
+    """
+    model_name = None
+
+    for n, m in MODEL_FACTORY.items():
+        if type(model) is m:
+            model_name = n
+
+    if model_name is None:
+        raise ValueError(f"Model type '{str(type(model))}' not supported")
+
+    output_path = HOMEWORK_DIR / f"{model_name}.th"
+    torch.save(model.state_dict(), output_path)
+
+    return output_path
 
 
 def calculate_model_size_mb(model: torch.nn.Module) -> float:
@@ -171,35 +191,24 @@ def calculate_model_size_mb(model: torch.nn.Module) -> float:
     return sum(p.numel() for p in model.parameters()) * 4 / 1024 / 1024
 
 
-def save_model(model):
+def debug_model(batch_size: int = 1):
     """
-    Use this function to save your model in train.py
+    Test your model implementation
+
+    Feel free to add additional checks to this function -
+    this function is NOT used for grading
     """
-    for n, m in model_factory.items():
-        if isinstance(model, m):
-            return torch.save(model.state_dict(), Path(__file__).resolve().parent / f"{n}.th")
-    raise ValueError(f"Model type '{str(type(model))}' not supported")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    sample_batch = torch.rand(batch_size, 3, 64, 64).to(device)
+
+    print(f"Input shape: {sample_batch.shape}")
+
+    model = load_model("classifier", in_channels=3, num_classes=6).to(device)
+    output = model(sample_batch)
+
+    # should output logits (b, num_classes)
+    print(f"Output shape: {output.shape}")
 
 
-def load_model(model_name: str, with_weights: bool = False, **model_kwargs):
-    """
-    Called by the grader to load a pre-trained model by name
-    """
-    r = model_factory[model_name](**model_kwargs)
-    if with_weights:
-        model_path = Path(__file__).resolve().parent / f"{model_name}.th"
-        assert model_path.exists(), f"{model_path.name} not found"
-        try:
-            r.load_state_dict(torch.load(model_path, map_location="cpu"))
-        except RuntimeError as e:
-            raise AssertionError(
-                f"Failed to load {model_path.name}, make sure the default model arguments are set correctly"
-            ) from e
-
-    # Limit model sizes since they will be zipped and submitted
-    model_size_mb = calculate_model_size_mb(r)
-    if model_size_mb > 10:
-        raise AssertionError(f"{model_name} is too large: {model_size_mb:.2f} MB")
-    print(f"Model size: {model_size_mb:.2f} MB")
-
-    return r
+if __name__ == "__main__":
+    debug_model()
