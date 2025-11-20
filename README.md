@@ -1,233 +1,187 @@
-# Homework 2
+# Homework 4
 
-In this homework, we will train **deep networks** to classify images from *SuperTuxKart*.
+In this homework, we will learn to drive with Transformers and convolutional networks!
 
-<img src="./viz.png" width="400">
+Colab Starter: [link](https://colab.research.google.com/drive/1wRuzQ15Q9-ef2L7Yju-KbAUHo3w1O10i?usp=sharing)
 
-This homework will require a GPU - if you don't have access to one, you can use Google Colab.
-
-We have provided some additional instructions in this [starter colab notebook](https://colab.research.google.com/drive/1k-OTy-eM7BDHqOrRyM9yTeLFvqdjpzvd)
+**NOTE:** Even if you're not using Colab, we recommend taking a look at the Colab notebook to see the recommended workflow and sample usage.
 
 ## Setup + Starter Code
 
-The starter code contains a `data` directory where you'll copy (or symlink) the [SuperTuxKart Classification Dataset](https://www.cs.utexas.edu/~bzhou/dl_class/classification_data.zip).
-Unzip the data directly into the homework folder, replacing the existing data directory completely.
+In this assignment, we'll be using the [SuperTuxKart Drive Dataset](https://www.cs.utexas.edu/~bzhou/dl_class/drive_data.zip) to train our models. 
 
-Make sure you see the following directories and files inside your main directory
+Download the dataset running the following command:
+```bash
+curl -s -L https://www.cs.utexas.edu/~bzhou/dl_class/drive_data.zip -o ./drive_data.zip && unzip -qo drive_data.zip
 ```
-homework/
-grader/
+
+**NOTE:** Make sure to download a fresh copy of the dataset!
+We've added some additional metadata needed for this homework.
+
+Verify that your project directory has the following structure:
+```
 bundle.py
-classification_data/train
-classification_data/val
+grader/
+homework/
+drive_data/
 ```
 You will run all scripts from inside this main directory.
 
-In the `homework` directory, you'll find the following starter code files
-- `train.py` - code to train, evaluate and save your models
+In the `homework` directory, you'll find the following:
 - `models.py` - where you will implement various models
-- `logger.py` - utility functions to log your model's performance using Tensorboard
-- `utils.py` - data loader for the SuperTuxKart dataset
+- `metrics.py` - metrics to evaluate your models
+- `datasets/` - contains loading and data transformations
+- `supertux_utils/` - game wrapper + visualization (optional)
 
-### Data Loader
+## Training
 
-In `utils.py` we have provided a data loader for the SuperTuxKart dataset.
-Labels and the corresponding image paths are saved in `labels.csv` and there are 6 classes of objects.
-In our setting, the label `background` corresponds to 0, `kart` is 1, `pickup` is 2, `nitro` is 3, `bomb` is 4 and `projectile` 5.
+As in the previous homework, you will implement the training code from scratch!
+This might seem cumbersome modifying the same code repeatedly, but this will help understand the engineering behind writing model/data agnostic training pipelines.
 
-Take a look at the `SuperTuxDataset` class and the `__init__`, `__len__`, and the `__getitem__` functions, as this demonstrates how to load and preprocess data for classification tasks.
-- `__init__` reads the csv file and stores the image paths and labels.
-- `__len__` returns the size of the dataset.
-- `__getitem__` returns a tuple of image, label where image is a `torch.Tensor` of size `(3,64,64)` with range `[0,1]`, and the label is an `int`.
+Recall that a training pipeline includes:
+* Creating an optimizer
+* Creating a model, loss, metrics
+* Loading the data
+* Running the optimizer for several epochs
+* Logging + saving your model (use the provided `save_model`)
 
-Note: you have access to two different directories of data:
-- a training set (used to train the model)
-- a validation set (used to approximate your performance on new unseen data).
+### Grader Instructions
 
-When we grade your solution, we will use a third data split (a hidden test set).
-We split the data into three to help you prevent overfitting (a phenomenon where the network performs very well on its training data, but cannot make sense of any new data; more on this later in class).
-
-### Local Grader Instructions
-
-You can grade your implementation after any part of the homework by running the following command from the main directory:
+You can grade your trained models by running the following command from the main directory:
 - `python3 -m grader homework -v` for medium verbosity
 - `python3 -m grader homework -vv` to include print statements
+- `python3 -m grader homework --disable_color` for Google Colab
 
-## Logging (10 pts)
+## Part 1a: MLP Planner (35 points)
 
-Logging is an important part of training models and provides a way to monitor/track your experiments.
-We start by learning how to use `tensorboard`, a tool for monitoring the training of our model.
+In this part, we will implement a MLP to learn how to drive!
+Rather than learning from images directly, we will predict the desired trajectory of the vehicle from the ground truth lane boundaries (similar to the output of Homework 3 models).
 
-We created a dummy training procedure in `logger.py` and provided you an instance of a `tb.SummaryWriter`.
-Implement the rest of `test_logging`.
-Use the summary writer to log the training loss at every iteration, the training accuracy at each epoch and the validation accuracy at each epoch.
-Remember to log everything in *global training steps*.
+After we have these the desired future trajectory (waypoints), we can use a simple controller to follow the waypoints and drive the vehicle in PySuperTuxKart.
 
-Here is a simple example of how to use the `SummaryWriter`.
-```python
-import torch.utils.tensorboard as tb
+To train this model, we'll use the following data:
+* `track_left` - `(n_track, 2)` float, left lane boundaries points
+* `track_right` - `(n_track, 2)` float, right lane boundaries points
+* `waypoints` - `(n_waypoints, 2)` float, target waypoints
+* `waypoints_mask` - `(n_waypoints,)` bool mask indicating "clean" waypoints
 
-logger = tb.SummaryWriter('cnn')
-logger.add_scalar('train/loss', t_loss, 0)
-```
-In `logger.py`, you should **not** create your own `SummaryWriter`, but rather use the one provided.
-You can test your logger by calling
+<img src="assets/sample.png" width="600">
+
+For parts 1a/1b, the model will not use the image as input, and instead take in the ground truth `track_left` and `track_right` as input.
+You can think of these two planners as having have perfect vision systems and knowledge of the world.
+
+Relevant code:
+* `datasets/road_dataset.py:RoadDataset.get_transform`
+* `datasets/road_transforms.py:EgoTrackProcessor`
+
+The data processing functions are already implemented, but feel free to add custom transformations for data augmentation.
+
+### Model
+
+Implement the `MLPPlanner` model in `models.py`.
+
+Your `forward` function receives a `(B, n_track, 2)` tensor of left lane boundaries and a `(B, n_track, 2)` tensor of right lane boundaries and should return a `(B, n_waypoints, 2)` tensor of predicted vehicle positions at the next `n_waypoints` time-steps.
+Find a suitable loss function to train your model, given that the output waypoints are real-valued.
+For all parts in the homework, the number of input boundary points `n_track=10` and the number of output waypoints `n_waypoints=3` are fixed.
+
+For full credit, your model should achieve:
+- < 0.2 Longitudinal error
+- < 0.6 Lateral error
+
+### Evaluation
+
+We will evaluate your planner with two offline metrics.
+Longitudinal error (absolute difference in the forward direction) is a good proxy for how well the model can predict the speed of the vehicle, while lateral error (absolute difference in the left/right direction) is a good proxy for how well the model can predict the steering of the vehicle.
+
+Once your model is able to predict the trajectory well, we can run the model in SuperTuxKart to see how well it drives!
+
+OPTIONAL: To get SuperTuxKart and the visualization scripts running, 
 ```bash
-python3 -m homework.logger --exp_dir logs
+pip install PySuperTuxKartData
+pip install PySuperTuxKart --index-url=https://www.cs.utexas.edu/~bzhou/dl_class/pystk
+
+# PySuperTuxKart requires several dependencies and has only been tested on certain systems.
+# Check out https://www.cs.utexas.edu/~bzhou/dl_class/pystk/pysupertuxkart/
+# for the full list of pre-built supported python versions / OS / CPU architectures.
+
+# If this doesn't work, you can always run your model on Colab,
+# or you can trying installing from source https://github.com/philkr/pystk
 ```
-To view the logs in tensorboard,
-- Spawn a new terminal and start a tensorboard server: `tensorboard --logdir logs`.
-- Open up a web browser and navigate to the provided URL (usually `localhost:6006`).
 
-## Classification Loss (10 pts)
+Getting this installed can be tricky and don't worry if you can't get PySuperTuxKart running locally - we'll still be able to evaluate your model when you submit.
+Additionally, the offline metrics are a strong proxy for how well the model will perform when actually driving, so if your numbers are good, it will most likely drive well.
 
-Next, we'll implement the `ClassificationLoss` in `models.py`.
-We will later use this loss to train our classifiers.
-You should implement the log-likelihood of a softmax classifier.
+If you want to visualize the driving, see the following files in `supertux_utils` module:
+* `evaluate.py` - logic on how the model's predictions are used to drive and how the game is run
+* `visualizations.py` - matplotlib visualzation of the driving (requires `imageio` to be installed)
 
-$$-\log\left(\frac{\exp(x_l) }{ \sum_j \exp(x_j)} \right),$$
-where $x$ are the logits and $l$ is the label.
-You may use existing PyTorch functions to implement this.
+Then you can run the following to see how your model drives:
+```bash
+python3 -m homework.supertux_utils.evaluate --model mlp_planner --track lighthouse
+```
+
+See `homework/supertux_utils/evaluate.py` for additional flags.
+
+### Part 1b: Transformer Planner (35 points)
+
+We'll build a similar model to Part 1a, but this time we'll use a Transformer.
+
+Compared to the MLP model, there are many more ways to design this model!
+One way to do this is by using a set of `n_waypoints` learned query embeddings to attend over the set of points in lane boundaries.
+More specifically, the network will consist of cross attention using the waypoint embeddings as queries, and the lane boundary features as the keys and values.
+
+This architecture most closely resembles the [Perceiver](https://arxiv.org/pdf/2103.03206) model, where in our setting, the "latent array" corresponds to the target waypoint query embeddings (`nn.Embedding`), while the "byte array" refers to the encoded input lane boundaries.
+
+<img src="assets/perceiver_architecture.png" width="600">
+
+Training the transformer will likely require more tuning, so make sure to optimize your training pipeline to allow for faster experimentation.
+
+For full credit, your model should achieve:
+- < 0.2 Longitudinal error
+- < 0.6 Lateral error
 
 ### Relevant Operations
- - [torch.nn.functional](https://pytorch.org/docs/stable/nn.html#torch-nn-functional)
+- [torch.nn.Embedding](https://pytorch.org/docs/stable/generated/torch.nn.Embedding.html)
+- [torch.nn.TransformerDecoderLayer](https://pytorch.org/docs/stable/generated/torch.nn.TransformerDecoderLayer.html)
+- [torch.nn.TransformerDecoder](https://pytorch.org/docs/stable/generated/torch.nn.TransformerDecoder.html)
 
-## Linear Model (5 pts)
+## Part 2: CNN Planner (30 points)
 
-Let's begin building our first neural network. We will build a neural network to classify different classes in SuperTuxKart dataset.
+One major limitation of the previous models is that they require the ground truth lane boundaries as input.
+In the previous homework, we trained a model to predict these in image space, but reprojecting the lane boundaries from image space to the vehicle's coordinate frame is non-trivial as small depth errors are magnified through the re-projection process.
 
-Implement the `LinearClassifier` class in `models.py`.
-Define the linear model and all layers in the `__init__` function, then implement `forward`.
-Your `forward` function receives a `(B,3,64,64)` tensor as an input and should return a `(B,6)` `torch.Tensor` (one value per class), where `B` stands for batch size.
-You can earn these full credits without training the model, just from the correct model definition.
+Rather than going through segmentation and depth estimation, we can learn to predict the lane boundaries in the vehicle's coordinate frame directly from the image!
 
-You can grade your linear model using
+Implement the `CNNPlanner` model in `models.py`.
 
-```bash
-python3 -m grader homework -v
-```
+Your `forward` function receives a `(B, 3, 96, 128)` image tensor as input and should return a `(B, n_waypoints, 2)` tensor of predicted vehicle positions at the next `n_waypoints` time-steps.
 
-### Hints/Tips
+The previous homeworks image backbones will be useful here, but you will need to modify the output layer to predict the desired waypoints.
 
-- Run the grader before training your model to make sure your definition of the model is correct.
-- Use `torch.nn.Linear` to define a linear layer.
-- If you are using the VSCode debugger, you might need to temporarily set `num_workers=0` in the DataLoader so that the debugger can attach to the correct process.
+Previously, we used CNNs + linear layers to predict tensors with shape
+- `(B, num_classes)` for classification
+- `(B, num_classes, H, W)` for segmentation
+- `(B, 1, H, W)` for depth
 
-### Relevant Operations
- - [torch.nn.Linear](https://pytorch.org/docs/stable/nn.html#linear)
- - [torch.tensor.View](https://pytorch.org/docs/stable/tensors.html#torch.Tensor.view)
- - and all previous
+But now we need to predict waypoints `(B, n_waypoints, 2)`.
 
-## Training the Linear Model (15 pts)
+One simple way to do this is simply produce a `(B, n_waypoints * 2)` tensor and reshape it to `(B, n_waypoints, 2)`.
 
-Train your linear model in `train.py`.
-
-Complete the code for a full training procedure.
-This includes:
- * Creating a model, loss, optimizer
- * Loading the data: `train` and `val`
- * Running the optimizer for several epochs (the default `max_epochs` might not be enough)
- * Saving your final model, using `save_model`
-
-Train your network using
-```bash
-python3 -m homework.train --model_name linear
-```
-
-You can then test your trained model using
-```bash
-python3 -m grader homework -v
-```
-
-The accuracy cutoff for this section is 0.70 on the validation/test set.
-
-### Hints/Tips
-- You might find it useful to store optimization parameters in the `ArgumentParser`, and quickly try a few from the command-line.
-- Try to write your training code to be model agnostic. We will swap out the model below.
-
-We will use the model checkpoint `linear.th` to grade your trained model's performance.
-You can grade your trained model using
-```bash
-python3 -m grader homework -v
-```
-
-### Relevant Operations
- - [torch.optim.Optimizer](https://pytorch.org/docs/stable/optim.html#torch.optim.Optimizer)
- - [torch.optim.SGD](https://pytorch.org/docs/stable/optim.html#torch.optim.SGD)
- - [torch.optim.Adam](https://pytorch.org/docs/stable/optim.html#torch.optim.Adam)
- - [torch.Tensor.backward](https://pytorch.org/docs/stable/tensors.html#torch.Tensor.backward)
- - and all previous
-
-## MLP Model (20 pts)
-
-Implement the `MLPClassifier` class in `models.py`.
-The inputs and outputs to the multi-layer perceptron are the same as the linear classifier.
-However, now you're learning a non-linear function.
-
-Train your network using
-```bash
-python3 -m homework.train --model_name mlp
-```
-
-The accuracy cutoff for this section is 0.80 on the validation/test set.
-
-### Relevant Operations
-
- - [torch.nn.ReLU](https://pytorch.org/docs/stable/nn.html#relu)
- - [torch.nn.Sequential](https://pytorch.org/docs/stable/nn.html#sequential)
- - and all previous
-
-## Deep Network (15 pts)
-
-Implement the `MLPClassifierDeep` class in `models.py`.
-For this part, build a model that has at least 4 layers.
-
-You can train your network using
-```bash
-python3 -m homework.train --model_name mlp_deep
-```
-
-The accuracy cutoff for this section is 0.80 on the validation/test set.
-
-### Hints/Tips
-- You can use `torch.nn.Sequential` to easily build a multi-layer model.
-- This part mainly requires tuning the number of layers in your model.
-- Try to pass a `num_layers` argument to your model to tune efficiently.
-- You might need to tune your learning rate `lr` and `batch_size`.
-- You might need to tune the hidden dimension of your model ('width' of each layer)
-
-## Deep Network with Residual Connections (20 pts)
-
-Implement the `MLPClassifierDeepResidual` class in `models.py`.
-
-This time, let's try to build a model that has at least 4 layers, and with residual connections.
-Residual connections are a way to help with the vanishing gradient problem in deep networks.
-
-You can train your network using
-```bash
-python3 -m homework.train --model_name mlp_deep_residual
-```
-
-The accuracy cutoff for this section is 0.80 on the validation/test set.
-
-### Hints/Tips
-- Run the grader before training your model to make sure your residual connections are implemented properly.
-- You can use `torch.nn.ModuleList` to store your layers. This will allow you to easily iterate over the layers in your forward function.
-
-### Relevant Operations
- - [ResNet](https://arxiv.org/abs/1512.03385)
- - [torch.nn.ModuleList](https://pytorch.org/docs/stable/generated/torch.nn.ModuleList.html#torch.nn.ModuleList)
- - and all previous
+For full credit, your model should achieve:
+- < 0.30 Longitudinal error
+- < 0.45 Lateral error
 
 ## Submission
 
-Once you finished the assignment, create a submission bundle using
+Create a submission bundle (max size **60MB**) using:
 ```bash
-python3 bundle.py homework [YOUR UT ID]
+python3 bundle.py homework $YOUR_UT_ID
 ```
-and submit the zip file on canvas. Please note that the maximum file size our grader accepts is **40MB**. Please keep your model compact.
 
-Please double-check that your zip file was properly created, by grading it again
+If you notice that your bundle is too large, you can modify the `bundle.py` script and ignore large files by adding them manually to `BLACKLIST`.
+
+Please double-check that your zip file was properly created by grading it again.
 ```bash
-python3 -m grader [YOUR UT ID].zip
+python3 -m grader $YOUR_UT_ID.zip
 ```
+After verifying that the zip file grades successfully, you can submit it on Canvas.

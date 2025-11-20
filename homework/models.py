@@ -1,205 +1,171 @@
-"""
-Implement the following models for classification.
-
-Feel free to modify the arguments for each of model's __init__ function.
-This will be useful for tuning model hyperparameters such as hidden_dim, num_layers, etc,
-but remember that the grader will assume the default constructor!
-"""
-
 from pathlib import Path
 
 import torch
 import torch.nn as nn
 
-
-class ClassificationLoss(nn.Module):
-    def forward(self, logits: torch.Tensor, target: torch.LongTensor) -> torch.Tensor:
-        """
-        Multi-class classification loss
-        Hint: simple one-liner
-
-        Args:
-            logits: tensor (b, c) logits, where c is the number of classes
-            target: tensor (b,) labels
-
-        Returns:
-            tensor, scalar loss
-        """
-        raise NotImplementedError("ClassificationLoss.forward() is not implemented")
+HOMEWORK_DIR = Path(__file__).resolve().parent
+INPUT_MEAN = [0.2788, 0.2657, 0.2629]
+INPUT_STD = [0.2064, 0.1944, 0.2252]
 
 
-class LinearClassifier(nn.Module):
+class MLPPlanner(nn.Module):
     def __init__(
         self,
-        h: int = 64,
-        w: int = 64,
-        num_classes: int = 6,
+        n_track: int = 10,
+        n_waypoints: int = 3,
     ):
         """
         Args:
-            h: int, height of the input image
-            w: int, width of the input image
-            num_classes: int, number of classes
+            n_track (int): number of points in each side of the track
+            n_waypoints (int): number of waypoints to predict
         """
         super().__init__()
 
-        raise NotImplementedError("LinearClassifier.__init__() is not implemented")
+        self.n_track = n_track
+        self.n_waypoints = n_waypoints
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(
+        self,
+        track_left: torch.Tensor,
+        track_right: torch.Tensor,
+        **kwargs,
+    ) -> torch.Tensor:
         """
+        Predicts waypoints from the left and right boundaries of the track.
+
+        During test time, your model will be called with
+        model(track_left=..., track_right=...), so keep the function signature as is.
+
         Args:
-            x: tensor (b, 3, H, W) image
+            track_left (torch.Tensor): shape (b, n_track, 2)
+            track_right (torch.Tensor): shape (b, n_track, 2)
 
         Returns:
-            tensor (b, num_classes) logits
+            torch.Tensor: future waypoints with shape (b, n_waypoints, 2)
         """
-        raise NotImplementedError("LinearClassifier.forward() is not implemented")
+        raise NotImplementedError
 
 
-class MLPClassifier(nn.Module):
+class TransformerPlanner(nn.Module):
     def __init__(
         self,
-        h: int = 64,
-        w: int = 64,
-        num_classes: int = 6,
+        n_track: int = 10,
+        n_waypoints: int = 3,
+        d_model: int = 64,
     ):
-        """
-        An MLP with a single hidden layer
-
-        Args:
-            h: int, height of the input image
-            w: int, width of the input image
-            num_classes: int, number of classes
-        """
         super().__init__()
 
-        raise NotImplementedError("MLPClassifier.__init__() is not implemented")
+        self.n_track = n_track
+        self.n_waypoints = n_waypoints
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        self.query_embed = nn.Embedding(n_waypoints, d_model)
+
+    def forward(
+        self,
+        track_left: torch.Tensor,
+        track_right: torch.Tensor,
+        **kwargs,
+    ) -> torch.Tensor:
         """
+        Predicts waypoints from the left and right boundaries of the track.
+
+        During test time, your model will be called with
+        model(track_left=..., track_right=...), so keep the function signature as is.
+
         Args:
-            x: tensor (b, 3, H, W) image
+            track_left (torch.Tensor): shape (b, n_track, 2)
+            track_right (torch.Tensor): shape (b, n_track, 2)
 
         Returns:
-            tensor (b, num_classes) logits
+            torch.Tensor: future waypoints with shape (b, n_waypoints, 2)
         """
-        raise NotImplementedError("MLPClassifier.forward() is not implemented")
+        raise NotImplementedError
 
 
-class MLPClassifierDeep(nn.Module):
+class CNNPlanner(torch.nn.Module):
     def __init__(
         self,
-        h: int = 64,
-        w: int = 64,
-        num_classes: int = 6,
+        n_waypoints: int = 3,
     ):
-        """
-        An MLP with multiple hidden layers
-
-        Args:
-            h: int, height of image
-            w: int, width of image
-            num_classes: int
-
-        Hint - you can add more arguments to the constructor such as:
-            hidden_dim: int, size of hidden layers
-            num_layers: int, number of hidden layers
-        """
         super().__init__()
 
-        raise NotImplementedError("MLPClassifierDeep.__init__() is not implemented")
+        self.n_waypoints = n_waypoints
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        self.register_buffer("input_mean", torch.as_tensor(INPUT_MEAN), persistent=False)
+        self.register_buffer("input_std", torch.as_tensor(INPUT_STD), persistent=False)
+
+    def forward(self, image: torch.Tensor, **kwargs) -> torch.Tensor:
         """
         Args:
-            x: tensor (b, 3, H, W) image
+            image (torch.FloatTensor): shape (b, 3, h, w) and vals in [0, 1]
 
         Returns:
-            tensor (b, num_classes) logits
+            torch.FloatTensor: future waypoints with shape (b, n, 2)
         """
-        raise NotImplementedError("MLPClassifierDeep.forward() is not implemented")
+        x = image
+        x = (x - self.input_mean[None, :, None, None]) / self.input_std[None, :, None, None]
+
+        raise NotImplementedError
 
 
-class MLPClassifierDeepResidual(nn.Module):
-    def __init__(
-        self,
-        h: int = 64,
-        w: int = 64,
-        num_classes: int = 6,
-    ):
-        """
-        Args:
-            h: int, height of image
-            w: int, width of image
-            num_classes: int
-
-        Hint - you can add more arguments to the constructor such as:
-            hidden_dim: int, size of hidden layers
-            num_layers: int, number of hidden layers
-        """
-        super().__init__()
-
-        raise NotImplementedError("MLPClassifierDeepResidual.__init__() is not implemented")
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        Args:
-            x: tensor (b, 3, H, W) image
-
-        Returns:
-            tensor (b, num_classes) logits
-        """
-        raise NotImplementedError("MLPClassifierDeepResidual.forward() is not implemented")
-
-
-model_factory = {
-    "linear": LinearClassifier,
-    "mlp": MLPClassifier,
-    "mlp_deep": MLPClassifierDeep,
-    "mlp_deep_residual": MLPClassifierDeepResidual,
+MODEL_FACTORY = {
+    "mlp_planner": MLPPlanner,
+    "transformer_planner": TransformerPlanner,
+    "cnn_planner": CNNPlanner,
 }
 
 
-def calculate_model_size_mb(model: torch.nn.Module) -> float:
-    """
-    Args:
-        model: torch.nn.Module
-
-    Returns:
-        float, size in megabytes
-    """
-    return sum(p.numel() for p in model.parameters()) * 4 / 1024 / 1024
-
-
-def save_model(model):
-    """
-    Use this function to save your model in train.py
-    """
-    for n, m in model_factory.items():
-        if isinstance(model, m):
-            return torch.save(model.state_dict(), Path(__file__).resolve().parent / f"{n}.th")
-    raise ValueError(f"Model type '{str(type(model))}' not supported")
-
-
-def load_model(model_name: str, with_weights: bool = False, **model_kwargs):
+def load_model(
+    model_name: str,
+    with_weights: bool = False,
+    **model_kwargs,
+) -> torch.nn.Module:
     """
     Called by the grader to load a pre-trained model by name
     """
-    r = model_factory[model_name](**model_kwargs)
+    m = MODEL_FACTORY[model_name](**model_kwargs)
+
     if with_weights:
-        model_path = Path(__file__).resolve().parent / f"{model_name}.th"
+        model_path = HOMEWORK_DIR / f"{model_name}.th"
         assert model_path.exists(), f"{model_path.name} not found"
+
         try:
-            r.load_state_dict(torch.load(model_path, map_location="cpu"))
+            m.load_state_dict(torch.load(model_path, map_location="cpu"))
         except RuntimeError as e:
             raise AssertionError(
                 f"Failed to load {model_path.name}, make sure the default model arguments are set correctly"
             ) from e
 
-    # Limit model sizes since they will be zipped and submitted
-    model_size_mb = calculate_model_size_mb(r)
-    if model_size_mb > 10:
-        raise AssertionError(f"{model_name} is too large: {model_size_mb:.2f} MB")
-    print(f"Model size: {model_size_mb:.2f} MB")
+    # limit model sizes since they will be zipped and submitted
+    model_size_mb = calculate_model_size_mb(m)
 
-    return r
+    if model_size_mb > 20:
+        raise AssertionError(f"{model_name} is too large: {model_size_mb:.2f} MB")
+
+    return m
+
+
+def save_model(model: torch.nn.Module) -> str:
+    """
+    Use this function to save your model in train.py
+    """
+    model_name = None
+
+    for n, m in MODEL_FACTORY.items():
+        if type(model) is m:
+            model_name = n
+
+    if model_name is None:
+        raise ValueError(f"Model type '{str(type(model))}' not supported")
+
+    output_path = HOMEWORK_DIR / f"{model_name}.th"
+    torch.save(model.state_dict(), output_path)
+
+    return output_path
+
+
+def calculate_model_size_mb(model: torch.nn.Module) -> float:
+    """
+    Naive way to estimate model size
+    """
+    return sum(p.numel() for p in model.parameters()) * 4 / 1024 / 1024
